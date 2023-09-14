@@ -1,0 +1,95 @@
+import win32com.client, win32com.client.makepy, os, winerror, pandas as pd, errno, re
+from win32com.client.dynamic import ERRORS_BAD_CONTEXT
+import os
+import PyPDF2
+
+class Acrobat_scan_automation:
+    def __init__(self):
+        self.directory_path = r'D:\OneDrive - connect.hku.hk\研究\工具\pdf转excel'
+        #os.chdir(self.directory_path)
+        self.folder_name = {
+            "output": r'output',
+            "source": r'source',
+            }
+
+        self.excel_file = r'D:\OneDrive - connect.hku.hk\研究\工具\pdf转excel\output.xlsx'
+        self.output_csv = r'output_1.csv'
+        self.pdf_file = r'D:\OneDrive - connect.hku.hk\研究\工具\pdf转excel\111.pdf'
+        return
+
+    def pdf2excel(self,pdf_file,excel_file):
+        try:
+            ERRORS_BAD_CONTEXT.append(winerror.E_NOTIMPL)
+            src = os.path.abspath(os.path.join(self.folder_name['source'],pdf_file))
+            print('[INFO] abspath=',src)
+            win32com.client.makepy.GenerateFromTypeLibSpec('Acrobat')
+            adobe = win32com.client.DispatchEx('AcroExch.App')
+            avDoc = win32com.client.DispatchEx('AcroExch.AVDoc')
+            print('[INFO] Open',src)
+            avDoc.Open(src, src)
+            pdDoc = avDoc.GetPDDoc()
+            print('[INFO] pdDoc=',pdDoc)
+            jsObject = pdDoc.GetJSObject()
+            print('[INFO] jObject=',jsObject)
+            export_file = excel_file#os.path.abspath(os.path.join(self.folder_name['output'],excel_file))
+            print(export_file)
+            jsObject.SaveAs(export_file, 'com.adobe.acrobat.xml-1-00')
+            jsObject.SaveAs(export_file[:-4]+'.xlsx', 'com.adobe.acrobat.xlsx')      
+            # com.adobe.acrobat.xlsx；com.adobe.acrobat.xml-2003；com.adobe.acrobat.xml-1-00 
+
+        except Exception as e:
+            print(str(e))
+
+        finally:        
+            # avDoc.Close(True)
+            jsObject = None
+            pdDoc = None
+            avDoc = None
+            return
+
+    def pdflocation(self,pdff,uniqueword,keywords:list):
+        reader = PyPDF2.PdfReader(pdff)
+        pages_with_keyword = [] # 存放包含关键词的页面的页码
+        num_pages = len(reader.pages) # 获取总页数
+        for page_num in range(num_pages):
+            page = reader.pages[page_num] # 获取每一页
+            text = page.extract_text() # 提取文本内容
+            countkey=0
+            if uniqueword in text:
+                for keyword in keywords:
+                    if keyword in text: # 检查关键词是否存在于当前页
+                        countkey=countkey+1
+                if countkey/len(keywords)>=0.9:
+                    pages_with_keyword.append(int(page_num) ) 
+                    #pages_with_keyword.append(int(page_num) + 1) 
+        print(pages_with_keyword)
+        #裁剪
+        writer = PyPDF2.PdfWriter()
+        for page_with_keyword in pages_with_keyword:
+            page = reader.pages[page_with_keyword]
+            writer.add_page(page)
+        with open(pdff, "wb") as f: # 打开一个输出文件
+            writer.write(f) # 将新文件写入输出文件
+            f.close()
+
+        
+        return pages_with_keyword
+    
+    def main(self,base,uniqueword,keywords:list):
+        print('[INFO] Start using acrobat')
+        #self.pdf2excel(self.pdf_file, self.excel_file)
+        #base 文件夹位置
+        for item in os.listdir(base):
+            path = os.path.join(base, item)
+            pdfpage=self.pdflocation(path,uniqueword,keywords) #获取位置
+            print(pdfpage)
+            os.chdir(base)
+            if os.path.isfile(path):
+                # 如果只需要返回文件名，可以用os.path.basename (path)代替path
+                self.pdf2excel(path, os.path.basename (path)[:-4]+'.xml')
+        return
+
+
+if __name__ == '__main__': 
+    Program = Acrobat_scan_automation()
+    Program.main('D:\OneDrive - connect.hku.hk\平安证券\银行准入\欧洲','KM1',['etrics','apital ratio','isk-weighted','everage','igh-quality','iquidity','NSFR'])
